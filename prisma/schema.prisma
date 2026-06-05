@@ -1,0 +1,542 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_logs {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?         @db.Uuid
+  table_name     String          @db.VarChar(100)
+  record_id      String          @db.Uuid
+  action         String          @db.VarChar(20)
+  old_values     Json?
+  new_values     Json?
+  ip_address     String?         @db.Inet
+  user_agent     String?
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  internal_users internal_users? @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_al_user")
+
+  @@index([table_name, record_id, created_at(sort: Desc)], map: "idx_al_composite")
+  @@index([created_at(sort: Desc)], map: "idx_al_created")
+  @@index([record_id], map: "idx_al_record")
+  @@index([table_name], map: "idx_al_table")
+  @@index([user_id], map: "idx_al_user")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model countries {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                   @unique(map: "uq_countries_name") @db.VarChar(100)
+  iso_code_2             String                   @unique(map: "uq_countries_iso2") @db.Char(2)
+  iso_code_3             String                   @unique(map: "uq_countries_iso3") @db.Char(3)
+  continent              String                   @db.VarChar(50)
+  phone_prefix           String?                  @db.VarChar(10)
+  currency_code          String?                  @db.Char(3)
+  flag_emoji             String?                  @db.VarChar(10)
+  is_active              Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  delivery_estimates     delivery_estimates[]
+  forwarder_countries    forwarder_countries[]
+  forwarder_restrictions forwarder_restrictions[]
+  pricing_rules          pricing_rules[]
+  shipment_requests      shipment_requests[]
+  shipments              shipments[]
+  warehouses             warehouses[]
+
+  @@index([is_active], map: "idx_countries_active", where: raw("(is_active = true)"))
+  @@index([continent], map: "idx_countries_continent")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customers {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  auth_user_id       String?             @unique @db.Uuid
+  full_name          String              @db.VarChar(150)
+  phone              String              @db.VarChar(30)
+  whatsapp           String?             @db.VarChar(30)
+  email              String?             @db.VarChar(255)
+  city               String?             @db.VarChar(100)
+  address            String?
+  is_verified        Boolean             @default(false)
+  preferred_language String?             @default("fr") @db.VarChar(5)
+  created_at         DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime            @default(now()) @db.Timestamptz(6)
+  deleted_at         DateTime?           @db.Timestamptz(6)
+  reviews            reviews[]
+  shipment_requests  shipment_requests[]
+  shipments          shipments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model delivery_estimates {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id      String          @db.Uuid
+  country_id        String          @db.Uuid
+  transport_mode_id String          @db.Uuid
+  min_days          Int
+  max_days          Int
+  notes             String?
+  is_active         Boolean         @default(true)
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime        @default(now()) @db.Timestamptz(6)
+  countries         countries       @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_de_country")
+  forwarders        forwarders      @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_de_forwarder")
+  transport_modes   transport_modes @relation(fields: [transport_mode_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_de_transport_mode")
+
+  @@unique([forwarder_id, country_id, transport_mode_id], map: "uq_delivery_estimates")
+  @@index([forwarder_id], map: "idx_de_forwarder")
+  @@index([country_id, transport_mode_id], map: "idx_de_route")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model forwarder_categories {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id       String             @db.Uuid
+  category_id        String             @db.Uuid
+  is_accepted        Boolean            @default(true)
+  restriction_notes  String?
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  product_categories product_categories @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fcat_category")
+  forwarders         forwarders         @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fcat_forwarder")
+
+  @@unique([forwarder_id, category_id], map: "uq_forwarder_categories")
+  @@index([category_id], map: "idx_fcat_category")
+  @@index([forwarder_id], map: "idx_fcat_forwarder")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model forwarder_countries {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id String     @db.Uuid
+  country_id   String     @db.Uuid
+  is_active    Boolean    @default(true)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  countries    countries  @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fc_country")
+  forwarders   forwarders @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fc_forwarder")
+
+  @@unique([forwarder_id, country_id], map: "uq_forwarder_countries")
+  @@index([country_id], map: "idx_fc_country")
+  @@index([forwarder_id], map: "idx_fc_forwarder")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model forwarder_documents {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id    String          @db.Uuid
+  document_type   String          @db.VarChar(30)
+  file_name       String          @db.VarChar(255)
+  file_path       String
+  file_size_bytes BigInt?
+  mime_type       String?         @db.VarChar(100)
+  description     String?
+  uploaded_by     String?         @db.Uuid
+  is_active       Boolean         @default(true)
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  forwarders      forwarders      @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_documents_forwarder")
+  internal_users  internal_users? @relation(fields: [uploaded_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_documents_uploaded_by")
+
+  @@index([forwarder_id], map: "idx_fd_forwarder")
+  @@index([forwarder_id, document_type], map: "idx_fd_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model forwarder_restrictions {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id       String              @db.Uuid
+  category_id        String?             @db.Uuid
+  country_id         String?             @db.Uuid
+  transport_mode_id  String?             @db.Uuid
+  restriction_type   String              @db.VarChar(30)
+  description        String
+  max_weight_kg      Decimal?            @db.Decimal(10, 2)
+  max_volume_cbm     Decimal?            @db.Decimal(10, 4)
+  surcharge_amount   Decimal?            @db.Decimal(12, 2)
+  surcharge_currency String?             @default("XOF") @db.Char(3)
+  is_absolute        Boolean             @default(true)
+  is_active          Boolean             @default(true)
+  created_at         DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime            @default(now()) @db.Timestamptz(6)
+  product_categories product_categories? @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fr_category")
+  countries          countries?          @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fr_country")
+  forwarders         forwarders          @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fr_forwarder")
+  transport_modes    transport_modes?    @relation(fields: [transport_mode_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fr_transport_mode")
+
+  @@index([category_id], map: "idx_fr_category")
+  @@index([forwarder_id, category_id, country_id, transport_mode_id], map: "idx_fr_composite")
+  @@index([forwarder_id], map: "idx_fr_forwarder")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model forwarder_transport_modes {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id      String          @db.Uuid
+  transport_mode_id String          @db.Uuid
+  is_active         Boolean         @default(true)
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  forwarders        forwarders      @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ftm_forwarder")
+  transport_modes   transport_modes @relation(fields: [transport_mode_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ftm_transport_mode")
+
+  @@unique([forwarder_id, transport_mode_id], map: "uq_forwarder_transport_modes")
+  @@index([forwarder_id], map: "idx_ftm_forwarder")
+  @@index([transport_mode_id], map: "idx_ftm_transport")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model forwarders {
+  id                                                               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_name                                                     String                      @db.VarChar(200)
+  contact_person                                                   String                      @db.VarChar(150)
+  phone                                                            String                      @db.VarChar(30)
+  whatsapp                                                         String?                     @db.VarChar(30)
+  email                                                            String?                     @db.VarChar(255)
+  address_abidjan                                                  String?
+  rccm                                                             String?                     @unique(map: "uq_forwarders_rccm") @db.VarChar(50)
+  description                                                      String?
+  status                                                           String                      @default("active") @db.VarChar(20)
+  partnership_status                                               String                      @default("prospect") @db.VarChar(30)
+  trust_level                                                      Int?                        @db.SmallInt
+  first_contact_date                                               DateTime?                   @db.Date
+  last_contact_date                                                DateTime?                   @db.Date
+  assigned_commercial_id                                           String?                     @db.Uuid
+  internal_notes                                                   String?
+  logo_url                                                         String?
+  website                                                          String?                     @db.VarChar(255)
+  social_links                                                     Json?                       @default("{}")
+  onboarded_by                                                     String?                     @db.Uuid
+  created_at                                                       DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                                                       DateTime                    @default(now()) @db.Timestamptz(6)
+  deleted_at                                                       DateTime?                   @db.Timestamptz(6)
+  internal_recommendation                                          String?                     @db.VarChar(30)
+  next_follow_up_date                                              DateTime?                   @db.Date
+  delivery_estimates                                               delivery_estimates[]
+  forwarder_categories                                             forwarder_categories[]
+  forwarder_countries                                              forwarder_countries[]
+  forwarder_documents                                              forwarder_documents[]
+  forwarder_interactions                                           forwarder_interactions[]
+  forwarder_restrictions                                           forwarder_restrictions[]
+  forwarder_transport_modes                                        forwarder_transport_modes[]
+  internal_users_forwarders_assigned_commercial_idTointernal_users internal_users?             @relation("forwarders_assigned_commercial_idTointernal_users", fields: [assigned_commercial_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_forwarders_commercial")
+  internal_users_forwarders_onboarded_byTointernal_users           internal_users?             @relation("forwarders_onboarded_byTointernal_users", fields: [onboarded_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_forwarders_onboarded")
+  pricing_rules                                                    pricing_rules[]
+  reviews                                                          reviews[]
+  shipments                                                        shipments[]
+  warehouses                                                       warehouses[]
+
+  @@index([status, partnership_status], map: "idx_forwarders_active", where: raw("(deleted_at IS NULL)"))
+  @@index([assigned_commercial_id], map: "idx_forwarders_commercial", where: raw("(assigned_commercial_id IS NOT NULL)"))
+  @@index([company_name], map: "idx_forwarders_company")
+  @@index([last_contact_date(sort: Desc)], map: "idx_forwarders_last_contact", where: raw("(deleted_at IS NULL)"))
+  @@index([partnership_status], map: "idx_forwarders_partnership")
+  @@index([rccm], map: "idx_forwarders_rccm", where: raw("(rccm IS NOT NULL)"))
+  @@index([status], map: "idx_forwarders_status")
+  @@index([company_name(ops: raw("gin_trgm_ops"))], map: "idx_forwarders_trgm_name", type: Gin)
+  @@index([trust_level], map: "idx_forwarders_trust", where: raw("((trust_level IS NOT NULL) AND (deleted_at IS NULL))"))
+  @@index([next_follow_up_date], map: "idx_forwarders_followup", where: raw("((next_follow_up_date IS NOT NULL) AND (deleted_at IS NULL))"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model internal_users {
+  id                                                           String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  auth_user_id                                                 String?                  @unique @db.Uuid
+  full_name                                                    String                   @db.VarChar(150)
+  email                                                        String                   @unique(map: "uq_internal_users_email") @db.VarChar(255)
+  phone                                                        String?                  @db.VarChar(30)
+  role                                                         String                   @default("operator") @db.VarChar(30)
+  is_active                                                    Boolean                  @default(true)
+  created_at                                                   DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at                                                   DateTime                 @default(now()) @db.Timestamptz(6)
+  audit_logs                                                   audit_logs[]
+  forwarder_documents                                          forwarder_documents[]
+  forwarder_interactions                                       forwarder_interactions[]
+  forwarders_forwarders_assigned_commercial_idTointernal_users forwarders[]             @relation("forwarders_assigned_commercial_idTointernal_users")
+  forwarders_forwarders_onboarded_byTointernal_users           forwarders[]             @relation("forwarders_onboarded_byTointernal_users")
+  reviews                                                      reviews[]
+  tracking_events                                              tracking_events[]
+
+  @@index([auth_user_id], map: "idx_iu_auth_user", where: raw("(auth_user_id IS NOT NULL)"))
+  @@index([role], map: "idx_iu_role")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notifications {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipient_type    String    @db.VarChar(20)
+  recipient_id      String    @db.Uuid
+  title             String    @db.VarChar(200)
+  body              String?
+  notification_type String    @db.VarChar(50)
+  channel           String    @default("in_app") @db.VarChar(20)
+  is_read           Boolean   @default(false)
+  read_at           DateTime? @db.Timestamptz(6)
+  metadata          Json?     @default("{}")
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([recipient_type, recipient_id], map: "idx_notif_recipient")
+  @@index([recipient_type, recipient_id, is_read], map: "idx_notif_unread", where: raw("(is_read = false)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pricing_rules {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id      String          @db.Uuid
+  country_id        String          @db.Uuid
+  transport_mode_id String          @db.Uuid
+  pricing_type      String          @db.VarChar(10)
+  currency          String          @default("XOF") @db.Char(3)
+  is_negotiable     Boolean         @default(false)
+  is_active         Boolean         @default(true)
+  valid_from        DateTime?       @db.Date
+  valid_until       DateTime?       @db.Date
+  notes             String?
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime        @default(now()) @db.Timestamptz(6)
+  deleted_at        DateTime?       @db.Timestamptz(6)
+  countries         countries       @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pr_country")
+  forwarders        forwarders      @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pr_forwarder")
+  transport_modes   transport_modes @relation(fields: [transport_mode_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pr_transport_mode")
+  pricing_tiers     pricing_tiers[]
+
+  @@unique([forwarder_id, country_id, transport_mode_id, pricing_type], map: "idx_pricing_rules_unique_active", where: raw("((deleted_at IS NULL) AND (is_active = true))"))
+  @@index([is_active], map: "idx_pr_active", where: raw("((deleted_at IS NULL) AND (is_active = true))"))
+  @@index([forwarder_id, country_id, transport_mode_id], map: "idx_pr_composite", where: raw("(deleted_at IS NULL)"))
+  @@index([country_id], map: "idx_pr_country")
+  @@index([forwarder_id], map: "idx_pr_forwarder")
+  @@index([transport_mode_id], map: "idx_pr_transport")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pricing_tiers {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pricing_rule_id String        @db.Uuid
+  min_value       Decimal       @db.Decimal(10, 2)
+  max_value       Decimal?      @db.Decimal(10, 2)
+  price_per_unit  Decimal       @db.Decimal(12, 2)
+  unit            String        @default("KG") @db.VarChar(10)
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  pricing_rules   pricing_rules @relation(fields: [pricing_rule_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pt_pricing_rule")
+
+  @@index([pricing_rule_id, min_value, max_value], map: "idx_pt_range")
+  @@index([pricing_rule_id], map: "idx_pt_rule")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model product_categories {
+  id                        String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String                   @unique(map: "uq_product_categories_name") @db.VarChar(100)
+  slug                      String                   @unique(map: "uq_product_categories_slug") @db.VarChar(100)
+  description               String?
+  icon                      String?                  @db.VarChar(50)
+  requires_special_handling Boolean                  @default(false)
+  is_active                 Boolean                  @default(true)
+  sort_order                Int                      @default(0)
+  created_at                DateTime                 @default(now()) @db.Timestamptz(6)
+  forwarder_categories      forwarder_categories[]
+  forwarder_restrictions    forwarder_restrictions[]
+  shipment_requests         shipment_requests[]
+
+  @@index([slug], map: "idx_categories_slug")
+  @@index([sort_order], map: "idx_categories_sort")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reviews {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id    String          @db.Uuid
+  forwarder_id   String          @db.Uuid
+  shipment_id    String?         @db.Uuid
+  rating         Int             @db.SmallInt
+  comment        String?
+  is_verified    Boolean         @default(false)
+  is_published   Boolean         @default(false)
+  moderated_by   String?         @db.Uuid
+  moderated_at   DateTime?       @db.Timestamptz(6)
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime        @default(now()) @db.Timestamptz(6)
+  customers      customers       @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rv_customer")
+  forwarders     forwarders      @relation(fields: [forwarder_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rv_forwarder")
+  internal_users internal_users? @relation(fields: [moderated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rv_moderated_by")
+  shipments      shipments?      @relation(fields: [shipment_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rv_shipment")
+
+  @@index([customer_id], map: "idx_rv_customer")
+  @@index([forwarder_id], map: "idx_rv_forwarder")
+  @@index([forwarder_id, rating], map: "idx_rv_rating")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model shipment_requests {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reference_number     String              @unique(map: "uq_shipment_requests_ref") @db.VarChar(30)
+  customer_id          String              @db.Uuid
+  origin_country_id    String              @db.Uuid
+  category_id          String?             @db.Uuid
+  transport_mode_id    String?             @db.Uuid
+  estimated_weight_kg  Decimal?            @db.Decimal(10, 2)
+  estimated_volume_cbm Decimal?            @db.Decimal(10, 4)
+  description          String?
+  status               String              @default("draft") @db.VarChar(30)
+  notes                String?
+  created_at           DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime            @default(now()) @db.Timestamptz(6)
+  product_categories   product_categories? @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sr_category")
+  countries            countries           @relation(fields: [origin_country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sr_country")
+  customers            customers           @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sr_customer")
+  transport_modes      transport_modes?    @relation(fields: [transport_mode_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sr_transport_mode")
+  shipments            shipments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model shipments {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tracking_number    String             @unique(map: "uq_shipments_tracking") @db.VarChar(50)
+  request_id         String?            @db.Uuid
+  forwarder_id       String             @db.Uuid
+  customer_id        String             @db.Uuid
+  warehouse_id       String?            @db.Uuid
+  origin_country_id  String?            @db.Uuid
+  transport_mode_id  String?            @db.Uuid
+  status             String             @default("pending") @db.VarChar(30)
+  actual_weight_kg   Decimal?           @db.Decimal(10, 2)
+  actual_volume_cbm  Decimal?           @db.Decimal(10, 4)
+  total_cost         Decimal?           @db.Decimal(14, 2)
+  currency           String?            @default("XOF") @db.Char(3)
+  estimated_delivery DateTime?          @db.Date
+  actual_delivery    DateTime?          @db.Date
+  notes              String?
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime           @default(now()) @db.Timestamptz(6)
+  reviews            reviews[]
+  countries          countries?         @relation(fields: [origin_country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sh_country")
+  customers          customers          @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sh_customer")
+  forwarders         forwarders         @relation(fields: [forwarder_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sh_forwarder")
+  shipment_requests  shipment_requests? @relation(fields: [request_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sh_request")
+  transport_modes    transport_modes?   @relation(fields: [transport_mode_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sh_transport_mode")
+  warehouses         warehouses?        @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sh_warehouse")
+  tracking_events    tracking_events[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tracking_events {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shipment_id    String          @db.Uuid
+  status         String          @db.VarChar(30)
+  location       String?         @db.VarChar(200)
+  description    String?
+  event_date     DateTime        @default(now()) @db.Timestamptz(6)
+  created_by     String?         @db.Uuid
+  metadata       Json?           @default("{}")
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  internal_users internal_users? @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_te_created_by")
+  shipments      shipments       @relation(fields: [shipment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_te_shipment")
+
+  @@index([shipment_id, event_date(sort: Desc)], map: "idx_te_date")
+  @@index([shipment_id], map: "idx_te_shipment")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model transport_modes {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String                      @unique(map: "uq_transport_modes_name") @db.VarChar(50)
+  code                      String                      @unique(map: "uq_transport_modes_code") @db.VarChar(20)
+  description               String?
+  icon                      String?                     @db.VarChar(50)
+  is_active                 Boolean                     @default(true)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  delivery_estimates        delivery_estimates[]
+  forwarder_restrictions    forwarder_restrictions[]
+  forwarder_transport_modes forwarder_transport_modes[]
+  pricing_rules             pricing_rules[]
+  shipment_requests         shipment_requests[]
+  shipments                 shipments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouses {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id  String      @db.Uuid
+  country_id    String      @db.Uuid
+  city          String      @db.VarChar(100)
+  full_address  String
+  postal_code   String?     @db.VarChar(20)
+  latitude      Decimal?    @db.Decimal(10, 7)
+  longitude     Decimal?    @db.Decimal(10, 7)
+  phone         String?     @db.VarChar(30)
+  contact_name  String?     @db.VarChar(150)
+  contact_phone String?     @db.VarChar(30)
+  contact_email String?     @db.VarChar(255)
+  notes         String?
+  is_active     Boolean     @default(true)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime    @default(now()) @db.Timestamptz(6)
+  deleted_at    DateTime?   @db.Timestamptz(6)
+  shipments     shipments[]
+  countries     countries   @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_warehouses_country")
+  forwarders    forwarders  @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_warehouses_forwarder")
+
+  @@index([forwarder_id, is_active], map: "idx_warehouses_active", where: raw("(deleted_at IS NULL)"))
+  @@index([city], map: "idx_warehouses_city")
+  @@index([country_id], map: "idx_warehouses_country")
+  @@index([forwarder_id], map: "idx_warehouses_forwarder")
+  @@index([latitude, longitude], map: "idx_warehouses_geo", where: raw("((latitude IS NOT NULL) AND (longitude IS NOT NULL))"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model forwarder_interactions {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  forwarder_id        String          @db.Uuid
+  user_id             String?         @db.Uuid
+  interaction_type    String          @db.VarChar(30)
+  title               String          @db.VarChar(200)
+  description         String?
+  interaction_date    DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
+  next_follow_up_date DateTime?       @db.Date
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+  forwarders          forwarders      @relation(fields: [forwarder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fi_forwarder")
+  internal_users      internal_users? @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fi_user")
+
+  @@index([forwarder_id, interaction_date(sort: Desc)], map: "idx_fi_date")
+  @@index([next_follow_up_date], map: "idx_fi_followup", where: raw("(next_follow_up_date IS NOT NULL)"))
+  @@index([forwarder_id], map: "idx_fi_forwarder")
+}
