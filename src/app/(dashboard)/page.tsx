@@ -62,7 +62,8 @@ export default async function DashboardPage() {
   let stats
   try {
     stats = await getStats()
-  } catch {
+  } catch (error) {
+    console.error("Dashboard getStats error:", error)
     // If some columns don't exist yet (migration not run), show fallback
     stats = null
   }
